@@ -12,14 +12,8 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id','first_name','last_name', 'email')
 
-class ProfilesSerializer(serializers.ModelSerializer):
+class AdminSerializer(serializers.ModelSerializer):
     user=UserSerializer(read_only=True)
     class Meta:
-        model = Profiles
-        fields = "__all__"
-class ProfilesAllSerializer(serializers.ModelSerializer):
-    #user=UserSerializer(read_only=True)
-    class Meta:
-        model = Profiles
+        model = Administradores
         fields = '__all__'
-        depth = 1

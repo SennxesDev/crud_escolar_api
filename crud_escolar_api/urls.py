@@ -22,10 +22,12 @@ from crud_escolar_api.views import auth
 urlpatterns = [
     #Version
         path('bootstrap/version', bootstrap.VersionView.as_view()),
-    #Create User
-        path('users/', users.UsersView.as_view()),
-    #User Data
-        path('me/', users.Userme.as_view()),
+    ##Create Admin
+        path('admin/', users.AdminView.as_view()),
+    #Admin Data
+        #path('lista-admins/', users.AdminAll.as_view()),
+    #Edit Admin
+        #path('admins-edit/', users.AdminsViewEdit.as_view()),
     #Login
         path('token/', auth.CustomAuthToken.as_view()),
     #Logout

@@ -37,20 +37,20 @@ class Userme(generics.CreateAPIView):
         #TODO: Regresar perfil del usuario
         return Response({})
 
-class UsersView(generics.CreateAPIView):
-
+class AdminView(generics.CreateAPIView):
+    #Registrar nuevo usuario
     @transaction.atomic
     def post(self, request, *args, **kwargs):
 
         user = UserSerializer(data=request.data)
         if user.is_valid():
             #Grab user data
-            role = 'user'
+            role = request.data['rol']
             first_name = request.data['first_name']
             last_name = request.data['last_name']
             email = request.data['email']
             password = request.data['password']
-
+            #Valida si existe el usuario o bien el email registrado
             existing_user = User.objects.filter(email=email).first()
 
             if existing_user:
@@ -64,17 +64,22 @@ class UsersView(generics.CreateAPIView):
 
 
             user.save()
-            user.set_password(password)
+            user.set_password(password) #Cifrar la contraseña
             user.save()
 
             group, created = Group.objects.get_or_create(name=role)
             group.user_set.add(user)
             user.save()
 
-            #Create a profile for the user
-            profile = Profiles.objects.create(user=user)
-            profile.save()
+            #Almacenar los datos adicionales del administrador
+            admin = Administradores.objects.create(user=user,
+                                            clave_admin= request.data["clave_admin"],
+                                            telefono= request.data["telefono"],
+                                            rfc= request.data["rfc"].upper(),
+                                            edad= request.data["edad"],
+                                            ocupacion= request.data["ocupacion"])
+            admin.save()
 
-            return Response({"profile_created_id": profile.id }, 201)
+            return Response({"admin_created_id": admin.id }, 201)
 
         return Response(user.errors, status=status.HTTP_400_BAD_REQUEST)
