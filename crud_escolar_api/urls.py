@@ -18,6 +18,8 @@ from django.urls import path
 from crud_escolar_api.views import bootstrap
 from crud_escolar_api.views import users
 from crud_escolar_api.views import auth
+from crud_escolar_api.views import alumnos
+from crud_escolar_api.views import maestros
 
 urlpatterns = [
     #Version
@@ -28,6 +30,18 @@ urlpatterns = [
         #path('lista-admins/', users.AdminAll.as_view()),
     #Edit Admin
         #path('admins-edit/', users.AdminsViewEdit.as_view()),
+    #Create Alumno
+        path('alumnos/', alumnos.AlumnosView.as_view()),
+    #Alumno Data
+        path('lista-alumnos/', alumnos.AlumnosAll.as_view()),
+    #Edit Alumno
+        #path('alumnos-edit/', alumnos.AlumnosViewEdit.as_view()),
+    #Create Maestro
+        path('maestros/', maestros.MaestrosView.as_view()),
+    #Maestro Data
+        #path('lista-maestros/', maestros.MaestrosAll.as_view()),
+    #Edit Maestro
+        #path('maestros-edit/', maestros.MaestrosViewEdit.as_view()),
     #Login
         path('token/', auth.CustomAuthToken.as_view()),
     #Logout
