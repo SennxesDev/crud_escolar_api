@@ -29,7 +29,7 @@ urlpatterns = [
     #Admin Data
         path('lista-admins/', users.AdminAll.as_view()),
     #Edit Admin
-        #path('admins-edit/', users.AdminsViewEdit.as_view()),
+        path('admins-edit/', users.AdminsViewEdit.as_view()),
     #Create Alumno
         path('alumnos/', alumnos.AlumnosView.as_view()),
     #Alumno Data
