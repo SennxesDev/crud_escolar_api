@@ -96,3 +96,42 @@ class AlumnosView(generics.CreateAPIView):
             return Response({"alumno_created_id": alumno.id }, 201)
 
         return Response(user.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class AlumnosViewEdit(generics.CreateAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    # # Contar total de alumnos
+    # def get(self, request, *args, **kwargs):
+    #     alumnos = Alumnos.objects.filter(user__is_active=1).order_by("id")
+    #     lista_alumnos = AlumnoSerializer(alumnos, many=True).data
+    #     total_alumnos = len(lista_alumnos)
+    #     return Response({'total_alumnos': total_alumnos, 'alumnos': lista_alumnos}, 200)
+
+    # Editar alumno
+    def put(self, request, *args, **kwargs):
+        alumno = get_object_or_404(Alumnos, id=request.data["id"])
+        alumno.matricula = request.data["matricula"]
+        alumno.curp = request.data["curp"].upper()
+        alumno.rfc = request.data["rfc"].upper()
+        alumno.fecha_nacimiento = request.data["fecha_nacimiento"]
+        alumno.edad = request.data["edad"]
+        alumno.telefono = request.data["telefono"]
+        alumno.ocupacion = request.data["ocupacion"]
+        alumno.save()
+
+        temp = alumno.user
+        temp.first_name = request.data["first_name"]
+        temp.last_name = request.data["last_name"]
+        temp.save()
+
+        user = AlumnoSerializer(alumno, many=False).data
+        return Response(user, 200)
+
+    # Eliminar alumno
+    def delete(self, request, *args, **kwargs):
+        alumno = get_object_or_404(Alumnos, id=request.GET.get("id"))
+        try:
+            alumno.user.delete()
+            return Response({"details": "Alumno eliminado"}, 200)
+        except Exception as e:
+            return Response({"details": "Error al eliminar alumno"}, 400)
