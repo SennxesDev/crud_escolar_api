@@ -20,6 +20,7 @@ from crud_escolar_api.views import users
 from crud_escolar_api.views import auth
 from crud_escolar_api.views import alumnos
 from crud_escolar_api.views import maestros
+from crud_escolar_api.views import eventos
 
 urlpatterns = [
     #Version
@@ -45,5 +46,8 @@ urlpatterns = [
     #Login
         path('token/', auth.CustomAuthToken.as_view()),
     #Logout
-        path('logout/', auth.Logout.as_view())
+        path('logout/', auth.Logout.as_view()),
+    #Eventos Academicos
+        path('eventos/', eventos.EventoListCreateView.as_view(), name='eventos-list-create'),
+        path('eventos/<int:pk>/', eventos.EventoRetrieveUpdateDestroyView.as_view(), name='eventos-rud'),
 ]

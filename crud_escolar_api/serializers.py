@@ -29,3 +29,8 @@ class MaestroSerializer(serializers.ModelSerializer):
     class Meta:
         model = Maestros
         fields = '__all__'
+
+class EventoAcademicoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventoAcademico
+        fields = '__all__'

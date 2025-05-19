@@ -54,3 +54,22 @@ class Maestros(models.Model):
 
     def __str__(self):
         return "Perfil del maestro "+self.first_name+" "+self.last_name
+    
+class EventoAcademico(models.Model):
+    TIPO_EVENTO = (
+        ('Conferencia', 'Conferencia'),
+        ('Taller', 'Taller'),
+        ('Curso', 'Curso'),
+        ('Seminario', 'Seminario'),
+    )
+
+    titulo = models.CharField(max_length=100)
+    descripcion = models.TextField()
+    fecha = models.DateField()
+    tipo = models.CharField(max_length=20, choices=TIPO_EVENTO)
+    ponente = models.CharField(max_length=100)
+    duracion_horas = models.PositiveIntegerField()
+    creado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return f"{self.titulo} - {self.tipo}"
