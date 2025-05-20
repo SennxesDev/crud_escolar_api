@@ -54,22 +54,22 @@ class Maestros(models.Model):
 
     def __str__(self):
         return "Perfil del maestro "+self.first_name+" "+self.last_name
-    
-class EventoAcademico(models.Model):
-    TIPO_EVENTO = (
-        ('Conferencia', 'Conferencia'),
-        ('Taller', 'Taller'),
-        ('Curso', 'Curso'),
-        ('Seminario', 'Seminario'),
-    )
 
-    titulo = models.CharField(max_length=100)
+class Eventos(models.Model):
+    name = models.CharField(max_length=255)
+    tipo_evento = models.CharField(max_length=100)
+    fecha_realizacion = models.DateField()
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    lugar = models.CharField(max_length=255)
+    publico_json = models.JSONField()
+    programa_educativo = models.CharField(max_length=255, blank=True, null=True)
+    responsable = models.ForeignKey(User, on_delete=models.CASCADE)
     descripcion = models.TextField()
-    fecha = models.DateField()
-    tipo = models.CharField(max_length=20, choices=TIPO_EVENTO)
-    ponente = models.CharField(max_length=100)
-    duracion_horas = models.PositiveIntegerField()
-    creado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-
+    cupo_maximo = models.PositiveIntegerField()
+    
     def __str__(self):
-        return f"{self.titulo} - {self.tipo}"
+        return self.name
+
+    class Meta:
+        verbose_name_plural = "Eventos"

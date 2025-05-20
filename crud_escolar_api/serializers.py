@@ -30,7 +30,12 @@ class MaestroSerializer(serializers.ModelSerializer):
         model = Maestros
         fields = '__all__'
 
-class EventoAcademicoSerializer(serializers.ModelSerializer):
+class EventoSerializer(serializers.ModelSerializer):
     class Meta:
-        model = EventoAcademico
+        model = Eventos
         fields = '__all__'
+        extra_kwargs = {
+            'publico_json': {'required': True},
+            'hora_inicio': {'required': True},
+            'hora_fin': {'required': True}
+        }
