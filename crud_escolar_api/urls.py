@@ -25,7 +25,7 @@ from crud_escolar_api.views import responsables
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
-router.register(r'eventos', eventos.EventoViewSet, basename='evento')
+router.register(r'eventos', eventos.EventosView, basename='evento')
 
 urlpatterns = [
     # Version
@@ -64,18 +64,8 @@ urlpatterns = [
     # Logout
     path('logout/', auth.Logout.as_view()),
     
-   #Eventos
-    #Create Evento
-        path('eventos/', eventos.EventosView.as_view()),
-    #Evento Data
-        path('lista-eventos/', eventos.EventosAll.as_view()),
-    #Edit Evento
-        path('eventos-edit/', eventos.EventosViewEdit.as_view()),
-        
-    # Endpoint para lista de responsables (administradores + maestros)
-    path('lista-responsables/', responsables.ResponsablesAll.as_view(), name='lista-responsables'),
-
-    # Incluye las rutas del router para el ViewSet (opcional)
-        path('api/', include(router.urls)),
-
+    path('eventos/', eventos.EventosView.as_view()),  # GET (con id param) y POST
+    path('lista-eventos/', eventos.EventosAll.as_view()),  # GET todos
+    path('eventos/<int:pk>/', eventos.EventosViewEdit.as_view()),  # PUT y DELETE
+    path('lista-responsables/', eventos.ResponsablesAll.as_view()),
 ]

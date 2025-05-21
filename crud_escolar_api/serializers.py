@@ -35,7 +35,12 @@ class EventoSerializer(serializers.ModelSerializer):
         model = Eventos
         fields = '__all__'
         extra_kwargs = {
-            'publico_json': {'required': True},
-            'hora_inicio': {'required': True},
-            'hora_fin': {'required': True}
+            'hora_inicio': {'format': '%H:%M:%S'},
+            'hora_fin': {'format': '%H:%M:%S'}
         }
+
+class ResponsableSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    nombre = serializers.CharField()
+    tipo = serializers.CharField()
+

@@ -62,11 +62,11 @@ class Eventos(models.Model):
     hora_inicio = models.TimeField()
     hora_fin = models.TimeField()
     lugar = models.CharField(max_length=255)
-    publico_json = models.JSONField()
+    publico_json = models.TextField()  # Almacena JSON como string
     programa_educativo = models.CharField(max_length=255, blank=True, null=True)
-    responsable = models.ForeignKey(User, on_delete=models.CASCADE)
+    responsable = models.IntegerField()  # ID del usuario responsable
     descripcion = models.TextField()
-    cupo_maximo = models.PositiveIntegerField()
+    cupo_maximo = models.IntegerField()
     
     def __str__(self):
         return self.name

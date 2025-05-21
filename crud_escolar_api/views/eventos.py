@@ -1,194 +1,245 @@
-from django.shortcuts import render
-from django.db.models import *
+from django.shortcuts import get_object_or_404
 from django.db import transaction
-from crud_escolar_api.serializers import *
-from crud_escolar_api.models import Eventos  # Importación explícita del modelo
-from rest_framework.authentication import BasicAuthentication, SessionAuthentication, TokenAuthentication
-from rest_framework.generics import CreateAPIView, DestroyAPIView, UpdateAPIView
-from rest_framework import permissions
-from rest_framework import generics
-from rest_framework import status
-from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.authtoken.models import Token
+from rest_framework import permissions, generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
-from rest_framework.reverse import reverse
-from rest_framework import viewsets
-from django.shortcuts import get_object_or_404
-from django.core import serializers
-from django.utils.html import strip_tags
-from django.contrib.auth import authenticate, login
-from django.contrib.auth.models import Group, User
-from django.contrib.auth import get_user_model
-from django_filters.rest_framework import DjangoFilterBackend
-from django_filters import rest_framework as filters
+from crud_escolar_api.models import Eventos, Maestros, Administradores
+from crud_escolar_api.serializers import EventoSerializer, ResponsableSerializer
 from datetime import datetime
-from django.conf import settings
-from django.template.loader import render_to_string
-import string
-import random
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 def convertir_hora_12_a_24(hora_str):
-    """
-    Convierte un string en formato '12:00 AM/PM' a formato 'HH:MM:SS'
-    """
+    """Convierte formato '12:00 AM/PM' a 'HH:MM:SS'"""
     try:
+        if not hora_str:
+            return None
         parsed_time = datetime.strptime(hora_str.strip(), "%I:%M %p")
         return parsed_time.strftime("%H:%M:%S")
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error conversión hora: {str(e)}")
         return None
 
-
-class EventosAll(generics.CreateAPIView):
+class EventosAll(generics.ListAPIView):
+    """Obtener todos los eventos"""
     permission_classes = (permissions.IsAuthenticated,)
-    def get(self, request, *args, **kwargs):
-        eventos = Eventos.objects.order_by("id")
-        eventos = EventoSerializer(eventos, many=True).data
-        if not eventos:
-            return Response({}, 400)
-        return Response(eventos, status=200)
-    
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import generics, status
-from rest_framework.response import Response
-from django.db import transaction
-import json
-from datetime import datetime
-from crud_escolar_api.models import Eventos
-from crud_escolar_api.serializers import EventoSerializer
+    serializer_class = EventoSerializer
+
+    def get_queryset(self):
+        return Eventos.objects.order_by("id")
 
 class EventosView(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, *args, **kwargs):
-        # Convertir horas formato 12h a 24h (ya tienes tu función)
-        hora_inicio_str = request.data.get("hora_inicio")
-        hora_fin_str = request.data.get("hora_fin")
-        hora_inicio = convertir_hora_12_a_24(hora_inicio_str)
-        hora_fin = convertir_hora_12_a_24(hora_fin_str)
-
-        if not hora_inicio or not hora_fin:
-            return Response({"error": "Formato de hora inválido. Usa hh:mm AM/PM"}, status=400)
-
-        try:
-            formato = "%H:%M:%S"
-            hora_inicio_time = datetime.strptime(hora_inicio, formato).time()
-            hora_fin_time = datetime.strptime(hora_fin, formato).time()
-        except ValueError:
-            return Response({"error": "Hora inicio/fin debe estar en formato HH:MM:SS"}, status=400)
-
-        # Validar nombre duplicado
-        name = request.data.get("name")
-        if Eventos.objects.filter(name=name).exists():
-            return Response({"message": f"El evento '{name}' ya existe"}, status=400)
-
-        # Validar cupo máximo
-        try:
-            cupo_maximo = int(request.data.get("cupo_maximo"))
-        except (ValueError, TypeError):
-            return Response({"error": "Cupo máximo debe ser un número válido"}, status=400)
-
-        # Parsear público objetivo
-        publico_json = request.data.get("publico_json")
-        if isinstance(publico_json, str):
-            try:
-                publico_json = json.loads(publico_json)
-            except json.JSONDecodeError:
-                return Response({"error": "Formato de público objetivo inválido"}, status=400)
-
-        if not publico_json or not isinstance(publico_json, list) or len(publico_json) == 0:
-            return Response({"error": "Público objetivo es obligatorio"}, status=400)
-
-        # Validar programa educativo si hay estudiantes
-        if "Estudiantes" in publico_json and not request.data.get("programa_educativo"):
-            return Response({"error": "Programa educativo es obligatorio si hay estudiantes"}, status=400)
-
-        # Crear evento
-        evento = Eventos.objects.create(
-            name=name,
-            tipo_evento=request.data.get("tipo_evento"),
-            fecha_realizacion=request.data.get("fecha_realizacion"),
-            responsable_id=request.user.id,
-            lugar=request.data.get("lugar"),
-            hora_inicio=hora_inicio_time,
-            hora_fin=hora_fin_time,
-            publico_json=publico_json,
-            programa_educativo=request.data.get("programa_educativo"),
-            descripcion=request.data.get("descripcion"),
-            cupo_maximo=cupo_maximo,
-        )
-        serializer = EventoSerializer(evento)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+    """Manejo de eventos individuales (GET, POST)"""
     
-class EventosViewEdit(generics.CreateAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
-    
-    def put(self, request, *args, **kwargs):
-        evento_id = request.data.get("id")
-        evento = get_object_or_404(Eventos, id=evento_id)
-
-        # Parsear publico_json si viene como string
-        publico_json = request.data.get("publico_json")
-        if isinstance(publico_json, str):
-            try:
-                publico_json = json.loads(publico_json)
-            except json.JSONDecodeError:
-                return Response({"error": "Formato de publico_json inválido"}, status=400)
-
-        # Validar si se requiere programa_educativo
-        if "Estudiantes" in publico_json and not request.data.get("programa_educativo"):
-            return Response({
-                "error": "programa_educativo es obligatorio si 'Estudiantes' está seleccionado"
-            }, status=400)
-        
-        # Convertir hora_inicio y hora_fin a objetos time()
-        hora_inicio_str = request.data.get("hora_inicio")
-        hora_fin_str = request.data.get("hora_fin")
-
-        try:
-            formato = "%H:%M:%S"
-            hora_inicio = datetime.strptime(hora_inicio_str, formato).time()
-            hora_fin = datetime.strptime(hora_fin_str, formato).time()
-        except ValueError:
-            return Response({"error": "Formato de hora inválido. Usa HH:MM:SS"}, status=400)
-
-        # Actualizar campos
-        evento.name = request.data.get("name")
-        evento.tipo_evento = request.data.get("tipo_evento")
-        evento.fecha_realizacion = request.data.get("fecha_realizacion")
-
-        # Horas ya deben estar en formato HH:MM:SS
-        evento.hora_inicio = hora_inicio
-        evento.hora_fin = hora_fin
-
-        evento.lugar = request.data.get("lugar")
-        evento.publico_json = publico_json  # Ya validado como lista
-        evento.programa_educativo = request.data.get("programa_educativo")
-        evento.descripcion = request.data.get("descripcion")
-        evento.cupo_maximo = int(request.data.get("cupo_maximo"))
-
-        try:
-            evento.save()
-            return Response({"message": "Evento actualizado correctamente"}, status=200)
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-    
-    def delete(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        """Obtener un evento específico"""
         evento = get_object_or_404(Eventos, id=request.GET.get("id"))
-        try:
-            evento.delete()
-            return Response({"details": "Evento eliminado correctamente"}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"details": "No se pudo eliminar el evento", "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        serializer = EventoSerializer(evento)
+        data = serializer.data
+        
+        # Procesamiento adicional para el frontend
+        if isinstance(data['publico_json'], str):
+            try:
+                data['publico_json'] = json.loads(data['publico_json'])
+            except json.JSONDecodeError:
+                data['publico_json'] = []
+        
+        # Formatear horas
+        for time_field in ['hora_inicio', 'hora_fin']:
+            if data[time_field]:
+                data[time_field] = data[time_field][:5]  # "14:00:00" → "14:00"
+        
+        return Response(data)
 
-class EventoViewSet(viewsets.ModelViewSet):
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        """Crear nuevo evento"""
+        try:
+            # Validación básica
+            required_fields = ['name', 'tipo_evento', 'fecha_realizacion', 
+                             'hora_inicio', 'hora_fin', 'lugar', 
+                             'publico_json', 'cupo_maximo']
+            for field in required_fields:
+                if field not in request.data:
+                    return Response(
+                        {"error": f"Campo requerido faltante: {field}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Procesamiento de horas
+            hora_inicio = convertir_hora_12_a_24(request.data["hora_inicio"])
+            hora_fin = convertir_hora_12_a_24(request.data["hora_fin"])
+            
+            if not all([hora_inicio, hora_fin]):
+                return Response(
+                    {"error": "Formato de hora inválido. Usar formato: 'HH:MM AM/PM'"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validación de nombre único
+            if Eventos.objects.filter(name=request.data["name"]).exists():
+                return Response(
+                    {"error": "Ya existe un evento con este nombre"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validación cupo máximo
+            try:
+                cupo_maximo = int(request.data["cupo_maximo"])
+                if cupo_maximo <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Cupo máximo debe ser un número entero positivo"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Procesamiento público objetivo
+            publico_json = request.data["publico_json"]
+            if isinstance(publico_json, str):
+                try:
+                    publico_json = json.loads(publico_json)
+                except json.JSONDecodeError:
+                    return Response(
+                        {"error": "Formato inválido para público objetivo"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            if not isinstance(publico_json, list) or len(publico_json) == 0:
+                return Response(
+                    {"error": "Se debe seleccionar al menos un público objetivo"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validación programa educativo
+            if "Estudiantes" in publico_json and not request.data.get("programa_educativo"):
+                return Response(
+                    {"error": "Programa educativo es requerido cuando el público incluye estudiantes"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Creación del evento
+            evento_data = {
+                **request.data,
+                "hora_inicio": hora_inicio,
+                "hora_fin": hora_fin,
+                "publico_json": json.dumps(publico_json),
+                "cupo_maximo": cupo_maximo
+            }
+
+            serializer = EventoSerializer(data=evento_data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            evento = serializer.save()
+            
+            return Response(
+                {
+                    "id": evento.id,
+                    "message": "Evento creado exitosamente"
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            logger.error(f"Error al crear evento: {str(e)}")
+            return Response(
+                {"error": "Error interno al procesar la solicitud"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class EventosViewEdit(generics.UpdateAPIView, generics.DestroyAPIView):
+    """Edición y eliminación de eventos"""
+    permission_classes = (permissions.IsAuthenticated,)
     queryset = Eventos.objects.all()
     serializer_class = EventoSerializer
+
+    def put(self, request, *args, **kwargs):
+        try:
+            evento = self.get_object()
+            data = request.data.copy()
+
+            # Procesamiento de horas si vienen en el request
+            for time_field in ['hora_inicio', 'hora_fin']:
+                if time_field in data:
+                    hora_convertida = convertir_hora_12_a_24(data[time_field])
+                    if not hora_convertida:
+                        return Response(
+                            {"error": f"Formato inválido para {time_field}"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    data[time_field] = hora_convertida
+
+            # Validación público objetivo
+            if 'publico_json' in data:
+                if isinstance(data['publico_json'], str):
+                    try:
+                        data['publico_json'] = json.loads(data['publico_json'])
+                    except json.JSONDecodeError:
+                        return Response(
+                            {"error": "Formato inválido para público objetivo"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                if "Estudiantes" in data['publico_json'] and not data.get('programa_educativo'):
+                    return Response(
+                        {"error": "Programa educativo es requerido cuando el público incluye estudiantes"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            serializer = self.get_serializer(evento, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            return Response(
+                {"message": "Evento actualizado correctamente"},
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            logger.error(f"Error al actualizar evento: {str(e)}")
+            return Response(
+                {"error": "Error interno al actualizar el evento"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def delete(self, request, *args, **kwargs):
+        try:
+            evento = self.get_object()
+            evento.delete()
+            return Response(
+                {"message": "Evento eliminado correctamente"},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Error al eliminar evento: {str(e)}")
+            return Response(
+                {"error": "Error interno al eliminar el evento"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class ResponsablesAll(APIView):
+    """Listado de responsables (maestros + administradores)"""
     permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        # Puedes personalizar el queryset aquí si es necesario
-        return Eventos.objects.all().order_by('-fecha_realizacion')
+
+    def get(self, request, *args, **kwargs):
+        maestros = Maestros.objects.filter(user__is_active=True).select_related('user')
+        admins = Administradores.objects.filter(user__is_active=True).select_related('user')
+
+        responsables = [
+            {
+                "id": m.user.id,
+                "nombre_completo": f"{m.user.first_name} {m.user.last_name}".strip(),
+                "tipo": "Maestro"
+            } for m in maestros
+        ] + [
+            {
+                "id": a.user.id,
+                "nombre_completo": f"{a.user.first_name} {a.user.last_name}".strip(),
+                "tipo": "Administrador"
+            } for a in admins
+        ]
+
+        return Response(responsables, status=status.HTTP_200_OK)
