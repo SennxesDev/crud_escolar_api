@@ -50,43 +50,25 @@ class EventosAll(generics.CreateAPIView):
             return Response({}, 400)
         return Response(eventos, status=200)
     
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, status
+from rest_framework.response import Response
+from django.db import transaction
+import json
+from datetime import datetime
+from crud_escolar_api.models import Eventos
+from crud_escolar_api.serializers import EventoSerializer
+
 class EventosView(generics.CreateAPIView):
-    def get(self, request, *args, **kwargs):
-        evento = get_object_or_404(Eventos, id=request.GET.get("id"))
-        evento_data = EventoSerializer(evento, many=False).data
+    permission_classes = [IsAuthenticated]
 
-        # Convertir publico_json a lista si es string
-        raw_publico = evento_data.get("publico_json", "")
-    
-        if not raw_publico:
-            evento_data["publico_json"] = []
-        elif isinstance(raw_publico, str):
-            try:
-                evento_data["publico_json"] = json.loads(raw_publico)
-            except json.JSONDecodeError:
-                evento_data["publico_json"] = []
-        else:
-            evento_data["publico_json"] = raw_publico
-
-        # Convertir time a string HH:MM:SS → HH:MM
-        if evento_data["hora_inicio"]:
-            evento_data["hora_inicio"] = str(evento_data["hora_inicio"])[:5]  # "14:00"
-
-        if evento_data["hora_fin"]:
-            evento_data["hora_fin"] = str(evento_data["hora_fin"])[:5]  # "17:00"
-
-        return Response(evento_data, status=200)
-    
-    # Registrar nuevo evento
-    @transaction.atomic
     def post(self, request, *args, **kwargs):
+        # Convertir horas formato 12h a 24h (ya tienes tu función)
         hora_inicio_str = request.data.get("hora_inicio")
         hora_fin_str = request.data.get("hora_fin")
-    
-        # Convertimos las horas
         hora_inicio = convertir_hora_12_a_24(hora_inicio_str)
         hora_fin = convertir_hora_12_a_24(hora_fin_str)
-    
+
         if not hora_inicio or not hora_fin:
             return Response({"error": "Formato de hora inválido. Usa hh:mm AM/PM"}, status=400)
 
@@ -96,20 +78,19 @@ class EventosView(generics.CreateAPIView):
             hora_fin_time = datetime.strptime(hora_fin, formato).time()
         except ValueError:
             return Response({"error": "Hora inicio/fin debe estar en formato HH:MM:SS"}, status=400)
-        
-        # Validación de nombre duplicado
+
+        # Validar nombre duplicado
         name = request.data.get("name")
         if Eventos.objects.filter(name=name).exists():
             return Response({"message": f"El evento '{name}' ya existe"}, status=400)
-    
-        # Validación adicional
-        cupo_maximo_str = request.data.get("cupo_maximo")
+
+        # Validar cupo máximo
         try:
-            cupo_maximo = int(cupo_maximo_str)
+            cupo_maximo = int(request.data.get("cupo_maximo"))
         except (ValueError, TypeError):
             return Response({"error": "Cupo máximo debe ser un número válido"}, status=400)
-        
-        # Parsear publico_json si viene como string
+
+        # Parsear público objetivo
         publico_json = request.data.get("publico_json")
         if isinstance(publico_json, str):
             try:
@@ -117,40 +98,30 @@ class EventosView(generics.CreateAPIView):
             except json.JSONDecodeError:
                 return Response({"error": "Formato de público objetivo inválido"}, status=400)
 
-        # Validar que haya al menos un público objetivo
         if not publico_json or not isinstance(publico_json, list) or len(publico_json) == 0:
             return Response({"error": "Público objetivo es obligatorio"}, status=400)
 
-        # Validar que haya al menos un público objetivo
-        if not isinstance(publico_json, list) or len(publico_json) == 0:
-            return Response({"error": "Público objetivo es obligatorio"}, status=400)
-    
-        # Validar programa_educativo si hay estudiantes
+        # Validar programa educativo si hay estudiantes
         if "Estudiantes" in publico_json and not request.data.get("programa_educativo"):
-            return Response({
-                "error": "Programa educativo es obligatorio si hay estudiantes"
-            }, status=400)
-    
-        try:
-            evento = Eventos.objects.create(
-                name=name,
-                tipo_evento=request.data.get("tipo_evento"),
-                fecha_realizacion=request.data.get("fecha_realizacion"),
-                responsable_id=request.data.get("responsable"),  # Usar responsable_id para el ID
-                lugar=request.data.get("lugar"),
-                hora_inicio=hora_inicio_time,
-                hora_fin=hora_fin_time,
-                publico_json=publico_json,  # Ya validado como lista
-                programa_educativo=request.data.get("programa_educativo"),
-                descripcion=request.data.get("descripcion"),
-                cupo_maximo=cupo_maximo
-            )
-            evento.save()
+            return Response({"error": "Programa educativo es obligatorio si hay estudiantes"}, status=400)
 
-            return Response({"evento_created_id": evento.id }, 201)
+        # Crear evento
+        evento = Eventos.objects.create(
+            name=name,
+            tipo_evento=request.data.get("tipo_evento"),
+            fecha_realizacion=request.data.get("fecha_realizacion"),
+            responsable_id=request.user.id,
+            lugar=request.data.get("lugar"),
+            hora_inicio=hora_inicio_time,
+            hora_fin=hora_fin_time,
+            publico_json=publico_json,
+            programa_educativo=request.data.get("programa_educativo"),
+            descripcion=request.data.get("descripcion"),
+            cupo_maximo=cupo_maximo,
+        )
+        serializer = EventoSerializer(evento)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
 class EventosViewEdit(generics.CreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
